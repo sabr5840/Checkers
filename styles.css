@@ -1,0 +1,109 @@
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #f0f0f0;
+}
+
+#game {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#board {
+    display: grid;
+    grid-template-columns: repeat(8, 50px);
+    grid-template-rows: repeat(8, 50px);
+    gap: 0;
+    border: 2px solid #333;
+}
+
+.cell {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.cell.dark {
+    background-color: #555;
+}
+
+.cell.light {
+    background-color: #eee;
+}
+
+.piece {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.3s ease; /* Add transition for smooth movement */
+}
+
+.piece.player1 {
+    background-color: red;
+}
+
+.piece.player2 {
+    background-color: black;
+}
+
+.selected {
+    border: 2px solid yellow;
+}
+
+.king-red {
+    background-color: darkred;
+}
+
+.king-black {
+    background-color: darkgray;
+}
+
+/* Styles for winner message */
+#winner-message {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 20px;
+    background-color: white;
+    border: 2px solid black;
+    text-align: center;
+    font-size: 24px;
+    z-index: 1000;
+}
+
+/* General button styles */
+button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+#try-again-button {
+    display: none;
+}
+
+#status {
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 18px;
+}
+
+#current-turn {
+    margin-bottom: 10px;
+}
+
+#player1-pieces, #player2-pieces {
+    margin: 5px 0;
+}
