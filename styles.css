@@ -30,11 +30,11 @@ body {
 }
 
 .cell.dark {
-    background-color: #555;
+    background-color: #eee;
 }
 
 .cell.light {
-    background-color: #eee;
+    background-color: #555;
 }
 
 .piece {
