@@ -15,18 +15,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let mustJump = false;
     let player1Pieces = 12;
     let player2Pieces = 12;
-    let mustJumpPiece = null; // Track the piece that must continue jumping
 
-    const initialBoard = [
-        ['black', 'empty', 'black', 'empty', 'black', 'empty', 'black', 'empty'],
-        ['empty', 'black', 'empty', 'black', 'empty', 'black', 'empty', 'black'],
-        ['black', 'empty', 'black', 'empty', 'black', 'empty', 'black', 'empty'],
-        ['empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty'],
-        ['empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty'],
-        ['empty', 'red', 'empty', 'red', 'empty', 'red', 'empty', 'red'],
-        ['red', 'empty', 'red', 'empty', 'red', 'empty', 'red', 'empty'],
-        ['empty', 'red', 'empty', 'red', 'empty', 'red', 'empty', 'red']
-    ];
+    // AI variables and constants
+    const INFINITY = 10000;
+    const NEG_INFINITY = -10000;
 
     function createBoard() {
         board.innerHTML = '';
@@ -47,17 +39,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function placePieces() {
-        initialBoard.forEach((row, rowIndex) => {
-            row.forEach((piece, colIndex) => {
-                const cell = cells[rowIndex * 8 + colIndex];
-                if (piece === 'red') {
-                    createPiece(cell, 'player1');
-                } else if (piece === 'black') {
-                    createPiece(cell, 'player2');
+        for (let row = 0; row < 3; row++) {
+            for (let col = 0; col < 8; col++) {
+                if ((row + col) % 2 !== 0) {
+                    createPiece(cells[row * 8 + col], 'player2');  // Placing black pieces at the top
                 }
-            });
-        });
-        console.log('Pieces placed according to initial board');
+            }
+        }
+
+        for (let row = 5; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                if ((row + col) % 2 !== 0) {
+                    createPiece(cells[row * 8 + col], 'player1');  // Placing red pieces at the bottom
+                }
+            }
+        }
+        console.log('Pieces placed');
     }
 
     function createPiece(cell, player) {
@@ -121,14 +118,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         updatePieceCount();
                         if (checkForMultipleJumps(endRow, endCol, selectedPiece.dataset.player, isKing)) {
                             selectedPiece.classList.add('selected');
-                            mustJumpPiece = selectedPiece;
                             console.log('Multiple jumps available');
                         } else {
-                            mustJumpPiece = null;
                             switchPlayer();
                         }
                     } else {
-                        mustJumpPiece = null;
                         switchPlayer();
                     }
 
@@ -171,10 +165,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getCapturedPiece(startRow, startCol, endRow, endCol) {
-        if (!isInBounds(startRow, startCol) || !isInBounds(endRow, endCol)) {
-            throw new Error('Invalid move: Out of bounds');
-        }
-
         if (Math.abs(endRow - startRow) === 2) {
             const middleRow = (startRow + endRow) / 2;
             const middleCol = (startCol + endCol) / 2;
@@ -183,6 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return null;
     }
+
 
     function checkForKing(cell) {
         if (cell.children.length === 0) return; // No piece in the cell to check
@@ -203,8 +194,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+
     function checkForMultipleJumps(row, col, player, isKing) {
-        const directions = isKing ?
+        const directions = isKing ? 
             [[-2, -2], [-2, 2], [2, -2], [2, 2]] :
             player === 'player1' ? [[-2, -2], [-2, 2]] : [[2, -2], [2, 2]];  // Adjust directions for player1 and player2
 
@@ -230,40 +222,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function switchPlayer() {
-        deselectAll(); // Deselect any selected pieces before switching player
         currentPlayer = currentPlayer === 'player1' ? 'player2' : 'player1';
         mustJump = false;
         selectedPiece = null;
         updateStatus();
-
-        if (currentPlayer === 'player2') {
-            setTimeout(() => {
-                if (mustJumpPiece) {
-                    const bestMove = getBestMoveForPiece(mustJumpPiece);
-                    if (bestMove) {
-                        applyBestMove(bestMove);
-                    } else {
-                        mustJumpPiece = null;
-                        switchPlayer();
-                    }
-                } else {
-                    iterativeDeepeningSearch(cloneGameState(), 10).then(bestMove => { // Use iterative deepening
-                        if (bestMove) {
-                            applyBestMove(bestMove);
-                        } else {
-                            declareWinner('Red');
-                        }
-                    });
-                }
-            }, 500); // Adding a delay for visualization
-        }
-
         console.log('Switched player:', currentPlayer);
-    }
 
-    function deselectAll() {
-        const selectedPieces = document.querySelectorAll('.selected');
-        selectedPieces.forEach(piece => piece.classList.remove('selected'));
+        if (currentPlayer === 'player2') {  // Assuming player2 is the computer
+            setTimeout(computerMove, 500);  // Adding a delay for the computer's move
+        }
     }
 
     function updatePieceCount() {
@@ -320,7 +287,6 @@ document.addEventListener('DOMContentLoaded', () => {
         mustJump = false;
         player1Pieces = 12;
         player2Pieces = 12;
-        mustJumpPiece = null;
         tryAgainButton.style.display = 'none';
         winnerMessage.style.display = 'none';
         createBoard();
@@ -342,387 +308,169 @@ document.addEventListener('DOMContentLoaded', () => {
     placePieces();
     updateStatus();
 
-    // Algoritme håndtering
-
-    // Helper function to clone the game state
-    function cloneGameState() {
-        return {
-            cells: cells.map(cell => ({
-                player: cell.children[0]?.dataset.player || undefined,
-                king: cell.children[0]?.dataset.king === 'true' || false
-            })),
-            currentPlayer,
-            player1Pieces,
-            player2Pieces,
-            mustJump
-        };
-    }
-
-    // Iterative Deepening Search
-    function iterativeDeepeningSearch(state, maxDepth) {
-        return new Promise((resolve) => {
-            let bestMove = null;
-            let startTime = performance.now();
-            let timeLimit = 1000; // 1 second
-    
-            for (let depth = 1; depth <= maxDepth; depth++) {
-                if (performance.now() - startTime > timeLimit) {
-                    break;
-                }
-                bestMove = getBestMove(state, depth);
-                console.log(`Depth: ${depth}, Best Move:`, bestMove);
+    // Helper Functions and AI Integration
+    function copy_board() {
+        const boardCopy = [];
+        cells.forEach(cell => {
+            const piece = cell.querySelector('.piece');
+            if (piece) {
+                boardCopy.push({
+                    player: piece.dataset.player,
+                    king: piece.dataset.king === 'true',
+                    row: parseInt(cell.dataset.row),
+                    col: parseInt(cell.dataset.col)
+                });
             }
-            resolve(bestMove);
         });
+        return boardCopy;
     }
-    
-    
 
-    // Minimax algorithm with Alpha-Beta pruning
-    
-    const transpositionTable = new Map();
-
-    function alphaBeta(state, depth, alpha, beta, isMaximizingPlayer, quiescence = false) {
-        const stateKey = JSON.stringify(state);
-        if (transpositionTable.has(stateKey)) {
-            return transpositionTable.get(stateKey);
-        }
-    
-        if (depth === 0 || isGameOver(state)) {
-            const evaluation = evaluateBoard(state);
-            transpositionTable.set(stateKey, evaluation);
-            return evaluation;
-        }
-    
-        if (!quiescence && depth <= 2) { // Enter quiescence search
-            return quiescenceSearch(state, alpha, beta, isMaximizingPlayer);
-        }
-    
-        const moves = getPossibleMoves(state, isMaximizingPlayer ? 'player1' : 'player2');
-        if (moves.length === 0) {
-            return isMaximizingPlayer ? -Infinity : Infinity;
-        }
-    
-        if (isMaximizingPlayer) {
-            let maxEval = -Infinity;
-            for (const move of moves) {
-                const newState = applyMove(cloneGameState(), move);
-                const eval = alphaBeta(newState, depth - 1, alpha, beta, false);
-                maxEval = Math.max(maxEval, eval);
-                alpha = Math.max(alpha, eval);
-                if (beta <= alpha) {
-                    break;
-                }
-            }
-            transpositionTable.set(stateKey, maxEval);
-            return maxEval;
+    function evaluate_position(x, y) {
+        if (x == 0 || x == 7 || y == 0 || y == 7) {
+            return 5;
         } else {
-            let minEval = Infinity;
-            for (const move of moves) {
-                const newState = applyMove(cloneGameState(), move);
-                const eval = alphaBeta(newState, depth - 1, alpha, beta, true);
-                minEval = Math.min(minEval, eval);
-                beta = Math.min(beta, eval);
-                if (beta <= alpha) {
-                    break;
-                }
+            return 3;
+        }
+    }
+
+    function utility(boardCopy) {
+        let sum = 0;
+        let computer_pieces = 0;
+        let computer_kings = 0;
+        let human_pieces = 0;
+        let human_kings = 0;
+        let computer_pos_sum = 0;
+        let human_pos_sum = 0;
+
+        boardCopy.forEach(piece => {
+            if (piece.player === 'player1') { // human
+                human_pieces += 1;
+                if (piece.king) human_kings += 1;
+                human_pos_sum += evaluate_position(piece.col, piece.row);
+            } else { // computer
+                computer_pieces += 1;
+                if (piece.king) computer_kings += 1;
+                computer_pos_sum += evaluate_position(piece.col, piece.row);
             }
-            transpositionTable.set(stateKey, minEval);
-            return minEval;
-        }
+        });
+
+        const piece_difference = computer_pieces - human_pieces;
+        const king_difference = computer_kings - human_kings;
+        const avg_human_pos = human_pos_sum / human_pieces || 0;
+        const avg_computer_pos = computer_pos_sum / computer_pieces || 0;
+        const avg_pos_diff = avg_computer_pos - avg_human_pos;
+
+        const features = [piece_difference, king_difference, avg_pos_diff];
+        const weights = [100, 10, 1];
+
+        let board_utility = 0;
+        features.forEach((feature, index) => {
+            board_utility += feature * weights[index];
+        });
+
+        return board_utility;
     }
 
-    function quiescenceSearch(state, alpha, beta, isMaximizingPlayer) {
-        let standPat = evaluateBoard(state);
-    
-        if (isMaximizingPlayer) {
-            if (standPat >= beta) return beta;
-            if (alpha < standPat) alpha = standPat;
-        } else {
-            if (standPat <= alpha) return alpha;
-            if (beta > standPat) beta = standPat;
-        }
-    
-        const moves = getPossibleMoves(state, isMaximizingPlayer ? 'player1' : 'player2').filter(move => move.capture);
-        for (const move of moves) {
-            const newState = applyMove(cloneGameState(), move);
-            const score = quiescenceSearch(newState, alpha, beta, !isMaximizingPlayer);
-    
-            if (isMaximizingPlayer) {
-                if (score >= beta) return beta;
-                if (alpha < score) alpha = score;
-            } else {
-                if (score <= alpha) return alpha;
-                if (beta > score) beta = score;
-            }
-        }
-    
-        return isMaximizingPlayer ? alpha : beta;
-    }
-    
-    function getBestMove(state, depth) {
-        let bestMove;
-        let bestValue = -Infinity;
-        const moves = getPossibleMoves(state, 'player2');
-
-        for (const move of moves) {
-            const newState = applyMove(cloneGameState(), move);
-            const moveValue = alphaBeta(newState, depth - 1, -Infinity, Infinity, false);
-            if (moveValue > bestValue) {
-                bestValue = moveValue;
-                bestMove = move;
-            }
-        }
-
-        console.log(`Best move at depth ${depth}:`, bestMove, 'Value:', bestValue);
-        return bestMove;
-    }
-
-
-    function isPieceSafe(row, col, state, player) {
-        const directions = player === 'player1' ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
-        for (const [rowOffset, colOffset] of directions) {
-            const newRow = row + rowOffset;
-            const newCol = col + colOffset;
-            if (isInBounds(newRow, newCol) && state.cells[newRow * 8 + newCol].player === undefined) {
-                return false;
-            }
-        }
-        return true;
-    }
-    
-    
-    
-
-    // Check if the game is over
-    function isGameOver(state) {
-        return state.player1Pieces === 0 || state.player2Pieces === 0;
-    }
-
-    // Get possible moves for a player
-    function getPossibleMoves(state, player) {
+    function get_available_moves(player, boardCopy) {
         const moves = [];
-        const captureMoves = [];
-        const directions = player === 'player1' ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
-    
-        state.cells.forEach((cell, index) => {
-            const row = Math.floor(index / 8);
-            const col = index % 8;
-    
-            if (cell.player === player) {
-                const isKing = cell.king;
-                const moveDirections = isKing ? directions.concat(directions.map(d => d.map(n => n * -1))) : directions;
-    
-                moveDirections.forEach(([rowOffset, colOffset]) => {
-                    const newRow = row + rowOffset;
-                    const newCol = col + colOffset;
-                    const jumpRow = row + 2 * rowOffset;
-                    const jumpCol = col + 2 * colOffset;
-    
-                    if (isInBounds(jumpRow, jumpCol) &&
-                        state.cells[newRow * 8 + newCol].player !== player &&
-                        state.cells[newRow * 8 + newCol].player !== undefined &&
-                        state.cells[jumpRow * 8 + jumpCol].player === undefined) {
-                        // Capture move
-                        captureMoves.push({ startRow: row, startCol: col, endRow: jumpRow, endCol: jumpCol, capture: true, capturedRow: newRow, capturedCol: newCol });
-                    } else if (isInBounds(newRow, newCol) && state.cells[newRow * 8 + newCol].player === undefined) {
-                        // Regular move
-                        moves.push({ startRow: row, startCol: col, endRow: newRow, endCol: newCol, capture: false });
+        boardCopy.forEach(piece => {
+            if (piece.player === player) {
+                const directions = piece.king ? 
+                    [[-1, -1], [-1, 1], [1, -1], [1, 1], [-2, -2], [-2, 2], [2, -2], [2, 2]] :
+                    player === 'player1' ? [[-1, -1], [-1, 1], [-2, -2], [-2, 2]] : [[1, -1], [1, 1], [2, -2], [2, 2]];
+                directions.forEach(direction => {
+                    const newRow = piece.row + direction[0];
+                    const newCol = piece.col + direction[1];
+                    if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
+                        const capturedPiece = getCapturedPiece(piece.row, piece.col, newRow, newCol);
+                        const endCell = cells[newRow * 8 + newCol];
+                        if ((!endCell || endCell.children.length === 0)) {
+                            if (Math.abs(direction[0]) === 2 && capturedPiece && capturedPiece.dataset.player !== player) {
+                                moves.push({ piece, from: { row: piece.row, col: piece.col }, to: { row: newRow, col: newCol }, capturedPiece });
+                            } else if (Math.abs(direction[0]) === 1 && !capturedPiece) {
+                                moves.push({ piece, from: { row: piece.row, col: piece.col }, to: { row: newRow, col: newCol } });
+                            }
+                        }
                     }
                 });
             }
         });
-    
-        // Sort moves to prioritize captures and moves towards promotion
-        captureMoves.sort((a, b) => b.endRow - a.endRow);
-        moves.sort((a, b) => b.endRow - a.endRow);
-    
-        // Return capture moves first if any exist
-        if (captureMoves.length > 0) {
-            return captureMoves;
-        }
-    
-        // Otherwise, return regular moves
         return moves;
     }
-    
-    function evaluateBoard(state) {
-        let evaluation = 0;
-        const centerBonus = 3;
-        const kingBonus = 10;
-        const pieceBonus = 5;
-        const safePieceBonus = 2;
-        const captureBonus = 50; // Increased bonus for capturing
-        const mobilityBonus = 1;
-        const kingSafetyBonus = 5;
-        const promotionZoneBonus = 2;
-    
-        state.cells.forEach((cell, index) => {
-            const row = Math.floor(index / 8);
-            const col = index % 8;
-            const pieceValue = (cell.king ? kingBonus : pieceBonus);
-    
-            if (cell.player === 'player1') {
-                evaluation += pieceValue;
-                if (row >= 3 && row <= 4 && col >= 3 && col <= 4) {
-                    evaluation += centerBonus; // Bonus for controlling the center
-                }
-                if (isPieceSafe(row, col, state, 'player1')) {
-                    evaluation += safePieceBonus; // Bonus for safe pieces
-                }
-                if (row <= 2) {
-                    evaluation += promotionZoneBonus; // Bonus for being close to promotion
-                }
-            } else if (cell.player === 'player2') {
-                evaluation -= pieceValue;
-                if (row >= 3 && row <= 4 && col >= 3 && col <= 4) {
-                    evaluation -= centerBonus; // Penalty for opponent controlling the center
-                }
-                if (isPieceSafe(row, col, state, 'player2')) {
-                    evaluation -= safePieceBonus; // Penalty for safe opponent pieces
-                }
-                if (row >= 5) {
-                    evaluation -= promotionZoneBonus; // Penalty for opponent being close to promotion
-                }
-            }
+
+    function alpha_beta_search(boardCopy, limit) {
+        const alpha = NEG_INFINITY;
+        const beta = INFINITY;
+        const available_moves = get_available_moves('player2', boardCopy);
+        const max = max_value(boardCopy, available_moves, limit, alpha, beta);
+
+        const best_moves = available_moves.filter(move => move.score === max);
+        const selected_move = best_moves[Math.floor(Math.random() * best_moves.length)];
+        return selected_move;
+    }
+
+    function max_value(boardCopy, moves, limit, alpha, beta) {
+        if (limit <= 0) {
+            return utility(boardCopy);
+        }
+        let max = NEG_INFINITY;
+        moves.forEach(move => {
+            const newBoard = movePiece(boardCopy, move);
+            const newMoves = get_available_moves('player1', newBoard);
+            const min_score = min_value(newBoard, newMoves, limit - 1, alpha, beta);
+            move.score = min_score;
+            max = Math.max(max, min_score);
+            if (max >= beta) return max;
+            alpha = Math.max(alpha, max);
         });
-    
-        evaluation += (state.player1Pieces - state.player2Pieces) * 10;
-    
-        // Add a bonus for the number of possible captures
-        const player1Captures = getPossibleMoves(state, 'player1').filter(move => move.capture).length;
-        const player2Captures = getPossibleMoves(state, 'player2').filter(move => move.capture).length;
-        evaluation += (player1Captures - player2Captures) * captureBonus;
-    
-        // Add a bonus for mobility
-        const player1Moves = getPossibleMoves(state, 'player1').length;
-        const player2Moves = getPossibleMoves(state, 'player2').length;
-        evaluation += (player1Moves - player2Moves) * mobilityBonus;
-    
-        // Add a bonus for king safety
-        const player1Kings = state.cells.filter(cell => cell.player === 'player1' && cell.king).length;
-        const player2Kings = state.cells.filter(cell => cell.player === 'player2' && cell.king).length;
-        evaluation += (player1Kings - player2Kings) * kingSafetyBonus;
-    
-        return evaluation;
-    }
-    
-    
-    
-
-    function getBestMoveForPiece(piece) {
-        const row = parseInt(piece.parentElement.dataset.row);
-        const col = parseInt(piece.parentElement.dataset.col);
-        const state = cloneGameState();
-        const moves = getPossibleMoves(state, piece.dataset.player);
-
-        return moves.find(move => move.startRow === row && move.startCol === col);
+        return max;
     }
 
-    // Helper function to check if coordinates are within board bounds
-    function isInBounds(row, col) {
-        return row >= 0 && row < 8 && col >= 0 && col < 8;
+    function min_value(boardCopy, moves, limit, alpha, beta) {
+        if (limit <= 0) {
+            return utility(boardCopy);
+        }
+        let min = INFINITY;
+        moves.forEach(move => {
+            const newBoard = movePiece(boardCopy, move);
+            const newMoves = get_available_moves('player2', newBoard);
+            const max_score = max_value(newBoard, newMoves, limit - 1, alpha, beta);
+            move.score = max_score;
+            min = Math.min(min, max_score);
+            if (min <= alpha) return min;
+            beta = Math.min(beta, min);
+        });
+        return min;
     }
 
-    function applyMove(state, move) {
-        const { startRow, startCol, endRow, endCol, capture, capturedRow, capturedCol } = move;
-    
-        if (!isInBounds(startRow, startCol) || !isInBounds(endRow, endCol)) {
-            throw new Error('Invalid move: Out of bounds');
+    function movePiece(boardCopy, move) {
+        const newBoard = boardCopy.map(piece => ({ ...piece }));
+        const piece = newBoard.find(p => p.row === move.from.row && p.col === move.from.col);
+        piece.row = move.to.row;
+        piece.col = move.to.col;
+        if (move.capturedPiece) {
+            const capturedPieceIndex = newBoard.findIndex(p => p.row === parseInt(move.capturedPiece.dataset.row) && p.col === parseInt(move.capturedPiece.dataset.col));
+            newBoard.splice(capturedPieceIndex, 1);
         }
-    
-        const startIndex = startRow * 8 + startCol;
-        const endIndex = endRow * 8 + endCol;
-        const capturedIndex = capturedRow * 8 + capturedCol;
-    
-        const piece = state.cells[startIndex];
-        
-        if (!piece || piece.player === undefined) {
-            throw new Error('Invalid move: No piece found at starting position');
-        }
-    
-        if (state.cells[endIndex].player !== undefined) {
-            throw new Error('Invalid move: Destination cell is occupied');
-        }
-    
-        // Move the piece to the new position
-        state.cells[endIndex] = { ...piece };
-        state.cells[startIndex] = { player: undefined, king: false };
-    
-        // Remove the captured piece if there is one
-        if (capture) {
-            if (!isInBounds(capturedRow, capturedCol)) {
-                throw new Error('Invalid move: Captured piece position out of bounds');
-            }
-    
-            if (state.cells[capturedIndex].player === undefined) {
-                console.error(`Captured piece not found at (${capturedRow}, ${capturedCol})`);
-                console.error('State at captured position:', state.cells[capturedIndex]);
-                console.error('Full state:', state);
-                throw new Error('Invalid move: No piece found at captured position');
-            }
-    
-            // Update player piece count
-            if (state.cells[capturedIndex].player === 'player1') {
-                state.player1Pieces -= 1;
-            } else {
-                state.player2Pieces -= 1;
-            }
-    
-            state.cells[capturedIndex] = { player: undefined, king: false };
-        }
-    
-        // Check for kinging
-        if ((piece.player === 'player1' && endRow === 0) || (piece.player === 'player2' && endRow === 7)) {
-            state.cells[endIndex].king = true;
-        }
-    
-        return state;
+        return newBoard;
     }
 
-    function applyBestMove(move) {
-        const startCell = cells[move.startRow * 8 + move.startCol];
-        const endCell = cells[move.endRow * 8 + move.endCol];
-        const piece = startCell.children[0];
-
-        animateMove(piece, endCell, move.startRow, move.startCol, move.endRow, move.endCol).then(() => {
-            const capturedPiece = getCapturedPiece(move.startRow, move.startCol, move.endRow, move.endCol);
-            if (capturedPiece) {
-                capturedPiece.remove();
-                updatePieceCount();
-
-                // Handle multiple jumps
-                const isKing = piece.dataset.king === 'true';
-                if (checkForMultipleJumps(move.endRow, move.endCol, piece.dataset.player, isKing)) {
-                    piece.classList.add('selected');
-                    mustJumpPiece = piece;  // Track the piece that must continue jumping
-                    setTimeout(() => {
-                        const additionalMove = getBestMoveForPiece(mustJumpPiece);
-                        if (additionalMove) {
-                            applyBestMove(additionalMove);
-                        } else {
-                            mustJumpPiece = null;
-                            switchPlayer();
-                        }
-                    }, 500);
-                } else {
-                    mustJumpPiece = null;
-                    switchPlayer();
+    function computerMove() {
+        const boardCopy = copy_board();
+        const bestMove = alpha_beta_search(boardCopy, 4); // Search depth can be adjusted
+        if (bestMove) {
+            const startCell = cells[bestMove.from.row * 8 + bestMove.from.col];
+            const endCell = cells[bestMove.to.row * 8 + bestMove.to.col];
+            const piece = startCell.querySelector('.piece');
+            animateMove(piece, endCell, bestMove.from.row, bestMove.from.col, bestMove.to.row, bestMove.to.col).then(() => {
+                if (bestMove.capturedPiece) {
+                    bestMove.capturedPiece.remove();
+                    updatePieceCount();
                 }
-            } else {
-                mustJumpPiece = null;
+                checkForKing(endCell);
+                checkGameOver();
                 switchPlayer();
-            }
-
-            checkForKing(cells[move.endRow * 8 + move.endCol]);
-            checkGameOver();
-        });
+            });
+        }
     }
-
-    
-    // Check if the game is over
-    function isGameOver(state) {
-    return state.player1Pieces === 0 || state.player2Pieces === 0;
-    }
-
 });
