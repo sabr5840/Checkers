@@ -1,5 +1,7 @@
 # Game of Checkers
 
+<img width="397" alt="image" src="https://github.com/sabr5840/Checkers/assets/113180288/beca789b-ae8c-4536-9e29-b10a4b70f76a">
+
 ## Introduction
 This is a web-based Checkers game developed to provide an engaging experience across various devices, from desktops to mobile devices. The game is built using a combination of HTML for structure, CSS for styling, and JavaScript for interactivity and game mechanics. The user interface is minimalist and intuitive, ensuring a smooth and responsive user experience.
 
