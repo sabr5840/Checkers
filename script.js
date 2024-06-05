@@ -15,10 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let mustJump = false;
     let player1Pieces = 12;
     let player2Pieces = 12;
-
-    // AI variables and constants
-    const INFINITY = 10000;
-    const NEG_INFINITY = -10000;
+    let mustJumpPiece = null; // Track the piece that must continue jumping
+    const memo = new Map();
 
     function createBoard() {
         board.innerHTML = '';
@@ -26,8 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let row = 0; row < 8; row++) {
             for (let col = 0; col < 8; col++) {
                 const cell = document.createElement('div');
-                cell.classList.add('cell');
-                cell.classList.add((row + col) % 2 === 0 ? 'light' : 'dark');
+                cell.classList.add('cell', (row + col) % 2 === 0 ? 'light' : 'dark');
                 cell.dataset.row = row;
                 cell.dataset.col = col;
                 cell.addEventListener('click', onCellClick);
@@ -76,12 +73,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (piece.dataset.player !== currentPlayer) {
-            console.log('Not current player\'s turn');
+            console.log("Not current player's turn");
             return;
         }
 
         if (selectedPiece) {
             selectedPiece.classList.remove('selected');
+            clearHighlights(); // Clear previous highlights
             if (selectedPiece === piece) {
                 selectedPiece = null;
                 console.log('Deselected piece');
@@ -92,6 +90,9 @@ document.addEventListener('DOMContentLoaded', () => {
         piece.classList.add('selected');
         selectedPiece = piece;
         console.log('Selected piece:', selectedPiece);
+
+        // Highlight possible moves for the selected piece
+        highlightPossibleMoves(selectedPiece);
     }
 
     function onCellClick(event) {
@@ -118,11 +119,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         updatePieceCount();
                         if (checkForMultipleJumps(endRow, endCol, selectedPiece.dataset.player, isKing)) {
                             selectedPiece.classList.add('selected');
+                            mustJumpPiece = selectedPiece;
                             console.log('Multiple jumps available');
                         } else {
+                            mustJumpPiece = null;
                             switchPlayer();
                         }
                     } else {
+                        mustJumpPiece = null;
                         switchPlayer();
                     }
 
@@ -164,6 +168,27 @@ document.addEventListener('DOMContentLoaded', () => {
         return false;
     }
 
+    function animateMove(piece, cell, startRow, startCol, endRow, endCol) {
+        return new Promise(resolve => {
+            const pieceRect = piece.getBoundingClientRect();
+            const cellRect = cell.getBoundingClientRect();
+            const offsetX = cellRect.left - pieceRect.left;
+            const offsetY = cellRect.top - pieceRect.top;
+
+            piece.style.transition = 'transform 0.3s ease';
+            piece.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+
+            piece.addEventListener('transitionend', function handler() {
+                piece.style.transition = '';
+                piece.style.transform = '';
+                piece.removeEventListener('transitionend', handler);
+                cell.appendChild(piece);
+                resolve();
+                console.log(`Moved piece to (${endRow}, ${endCol})`);
+            });
+        });
+    }
+
     function getCapturedPiece(startRow, startCol, endRow, endCol) {
         if (Math.abs(endRow - startRow) === 2) {
             const middleRow = (startRow + endRow) / 2;
@@ -173,7 +198,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return null;
     }
-
 
     function checkForKing(cell) {
         if (cell.children.length === 0) return; // No piece in the cell to check
@@ -194,17 +218,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
     function checkForMultipleJumps(row, col, player, isKing) {
-        const directions = isKing ? 
+        const directions = isKing ?
             [[-2, -2], [-2, 2], [2, -2], [2, 2]] :
-            player === 'player1' ? [[-2, -2], [-2, 2]] : [[2, -2], [2, 2]];  // Adjust directions for player1 and player2
+            player === 'player1' ? [[-2, -2], [-2, 2]] : [[2, -2], [2, 2]]; // Adjust directions for player1 and player2
 
         for (let [rowOffset, colOffset] of directions) {
             const newRow = row + rowOffset;
             const newCol = col + colOffset;
 
-            if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
+            if (isInBounds(newRow, newCol)) {
                 const middleRow = (row + newRow) / 2;
                 const middleCol = (col + newCol) / 2;
                 const middleCell = cells[middleRow * 8 + middleCol];
@@ -222,15 +245,42 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function switchPlayer() {
+        deselectAll(); // Deselect any selected pieces before switching player
         currentPlayer = currentPlayer === 'player1' ? 'player2' : 'player1';
         mustJump = false;
         selectedPiece = null;
         updateStatus();
-        console.log('Switched player:', currentPlayer);
 
-        if (currentPlayer === 'player2') {  // Assuming player2 is the computer
-            setTimeout(computerMove, 500);  // Adding a delay for the computer's move
+        if (currentPlayer === 'player2') {
+            setTimeout(() => {
+                if (mustJumpPiece) {
+                    const bestMove = getBestMoveForPiece(mustJumpPiece);
+                    if (bestMove) {
+                        applyBestMove(bestMove);
+                    } else {
+                        mustJumpPiece = null;
+                        switchPlayer();
+                    }
+                } else {
+                    const state = cloneGameState();
+                    const bestMove = getBestMoveAlphaBeta(state, 4); // Set depth to 4 for alpha-beta decision-making
+
+                    if (bestMove) {
+                        console.log('AlphaBeta best move: ', bestMove);
+                        applyBestMove(bestMove);
+                    } else {
+                        declareWinner('Red');
+                    }
+                }
+            }, 500); // Adding a delay for visualization
         }
+
+        console.log('Switched player:', currentPlayer);
+    }
+
+    function deselectAll() {
+        const selectedPieces = document.querySelectorAll('.selected');
+        selectedPieces.forEach(piece => piece.classList.remove('selected'));
     }
 
     function updatePieceCount() {
@@ -243,27 +293,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateStatus() {
         currentTurnDisplay.textContent = `Current Turn: ${currentPlayer === 'player1' ? 'Red' : 'Black'}`;
         updatePieceCount();
-    }
-
-    function animateMove(piece, cell, startRow, startCol, endRow, endCol) {
-        return new Promise(resolve => {
-            const pieceRect = piece.getBoundingClientRect();
-            const cellRect = cell.getBoundingClientRect();
-            const offsetX = cellRect.left - pieceRect.left;
-            const offsetY = cellRect.top - pieceRect.top;
-
-            piece.style.transition = 'transform 0.3s ease';
-            piece.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
-
-            piece.addEventListener('transitionend', function handler() {
-                piece.style.transition = '';
-                piece.style.transform = '';
-                piece.removeEventListener('transitionend', handler);
-                cell.appendChild(piece);
-                resolve();
-                console.log(`Moved piece to (${endRow}, ${endCol})`);
-            });
-        });
     }
 
     function checkGameOver() {
@@ -287,6 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
         mustJump = false;
         player1Pieces = 12;
         player2Pieces = 12;
+        mustJumpPiece = null;
         tryAgainButton.style.display = 'none';
         winnerMessage.style.display = 'none';
         createBoard();
@@ -308,169 +338,334 @@ document.addEventListener('DOMContentLoaded', () => {
     placePieces();
     updateStatus();
 
-    // Helper Functions and AI Integration
-    function copy_board() {
-        const boardCopy = [];
-        cells.forEach(cell => {
-            const piece = cell.querySelector('.piece');
-            if (piece) {
-                boardCopy.push({
-                    player: piece.dataset.player,
-                    king: piece.dataset.king === 'true',
-                    row: parseInt(cell.dataset.row),
-                    col: parseInt(cell.dataset.col)
-                });
-            }
-        });
-        return boardCopy;
+    function cloneGameState() {
+        return {
+            cells: cells.map(cell => {
+                return {
+                    player: cell.children[0]?.dataset.player,
+                    king: cell.children[0]?.dataset.king === 'true'
+                };
+            }),
+            currentPlayer,
+            player1Pieces,
+            player2Pieces
+        };
     }
 
-    function evaluate_position(x, y) {
-        if (x == 0 || x == 7 || y == 0 || y == 7) {
-            return 5;
+    function minimax(state, depth, alpha, beta, isMaximizingPlayer) {
+        const stateKey = JSON.stringify(state);
+        if (memo.has(stateKey)) {
+            return memo.get(stateKey);
+        }
+
+        if (depth === 0 || isGameOver(state)) {
+            const evaluation = evaluateBoard(state);
+            memo.set(stateKey, evaluation);
+            return evaluation;
+        }
+
+        let consideredMoves = [];
+
+        if (isMaximizingPlayer) {
+            let maxEval = -Infinity;
+            const moves = getPossibleMoves(state, 'player1');
+            for (const move of moves) {
+                const newState = applyMove(cloneGameState(), move);
+                const eval = minimax(newState, depth - 1, alpha, beta, false);
+                consideredMoves.push(move); // Track moves considered by minimax
+                maxEval = Math.max(maxEval, eval);
+                alpha = Math.max(alpha, eval);
+                if (beta <= alpha) {
+                    console.log(`Pruning branch at move (${move.startRow}, ${move.startCol}) to (${move.endRow}, ${move.endCol})`);
+                    break; // Prune the branch
+                }
+            }
+            clearHighlights();
+            highlightConsideredMoves(consideredMoves);
+            memo.set(stateKey, maxEval);
+            return maxEval;
         } else {
-            return 3;
+            let minEval = Infinity;
+            const moves = getPossibleMoves(state, 'player2');
+            for (const move of moves) {
+                const newState = applyMove(cloneGameState(), move);
+                const eval = minimax(newState, depth - 1, alpha, beta, true);
+                consideredMoves.push(move); // Track moves considered by minimax
+                minEval = Math.min(minEval, eval);
+                beta = Math.min(beta, eval);
+                if (beta <= alpha) {
+                    console.log(`Pruning branch at move (${move.startRow}, ${move.startCol}) to (${move.endRow}, ${move.endCol})`);
+                    break; // Prune the branch
+                }
+            }
+            clearHighlights();
+            highlightConsideredMoves(consideredMoves);
+            memo.set(stateKey, minEval);
+            return minEval;
         }
     }
 
-    function utility(boardCopy) {
-        let sum = 0;
-        let computer_pieces = 0;
-        let computer_kings = 0;
-        let human_pieces = 0;
-        let human_kings = 0;
-        let computer_pos_sum = 0;
-        let human_pos_sum = 0;
+    function alphaBeta(state, depth, alpha, beta, isMaximizingPlayer) {
+        return minimax(state, depth, alpha, beta, isMaximizingPlayer);
+    }
 
-        boardCopy.forEach(piece => {
-            if (piece.player === 'player1') { // human
-                human_pieces += 1;
-                if (piece.king) human_kings += 1;
-                human_pos_sum += evaluate_position(piece.col, piece.row);
-            } else { // computer
-                computer_pieces += 1;
-                if (piece.king) computer_kings += 1;
-                computer_pos_sum += evaluate_position(piece.col, piece.row);
+    function evaluateBoard(state) {
+        let evaluation = 0;
+        const pieceValue = 3;
+        const kingValue = 5;
+        const centerValue = 1;
+
+        state.cells.forEach((cell, index) => {
+            const row = Math.floor(index / 8);
+            const col = index % 8;
+            if (cell.player === 'player1') {
+                evaluation += pieceValue + (cell.king ? kingValue : 0);
+                evaluation += (7 - row); // Higher value for pieces closer to becoming king
+                evaluation += (col > 2 && col < 5 ? centerValue : 0); // Higher value for center control
+            } else if (cell.player === 'player2') {
+                evaluation -= pieceValue + (cell.king ? kingValue : 0);
+                evaluation -= row; // Higher value for pieces closer to becoming king
+                evaluation -= (col > 2 && col < 5 ? centerValue : 0); // Higher value for center control
             }
         });
 
-        const piece_difference = computer_pieces - human_pieces;
-        const king_difference = computer_kings - human_kings;
-        const avg_human_pos = human_pos_sum / human_pieces || 0;
-        const avg_computer_pos = computer_pos_sum / computer_pieces || 0;
-        const avg_pos_diff = avg_computer_pos - avg_human_pos;
+        const player1Moves = getPossibleMoves(state, 'player1').length;
+        const player2Moves = getPossibleMoves(state, 'player2').length;
 
-        const features = [piece_difference, king_difference, avg_pos_diff];
-        const weights = [100, 10, 1];
+        evaluation += player1Moves;
+        evaluation -= player2Moves;
 
-        let board_utility = 0;
-        features.forEach((feature, index) => {
-            board_utility += feature * weights[index];
-        });
-
-        return board_utility;
+        return evaluation;
     }
 
-    function get_available_moves(player, boardCopy) {
+    function isGameOver(state) {
+        return state.player1Pieces === 0 || state.player2Pieces === 0;
+    }
+
+    function getPossibleMoves(state, player) {
         const moves = [];
-        boardCopy.forEach(piece => {
-            if (piece.player === player) {
-                const directions = piece.king ? 
-                    [[-1, -1], [-1, 1], [1, -1], [1, 1], [-2, -2], [-2, 2], [2, -2], [2, 2]] :
-                    player === 'player1' ? [[-1, -1], [-1, 1], [-2, -2], [-2, 2]] : [[1, -1], [1, 1], [2, -2], [2, 2]];
-                directions.forEach(direction => {
-                    const newRow = piece.row + direction[0];
-                    const newCol = piece.col + direction[1];
-                    if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
-                        const capturedPiece = getCapturedPiece(piece.row, piece.col, newRow, newCol);
-                        const endCell = cells[newRow * 8 + newCol];
-                        if ((!endCell || endCell.children.length === 0)) {
-                            if (Math.abs(direction[0]) === 2 && capturedPiece && capturedPiece.dataset.player !== player) {
-                                moves.push({ piece, from: { row: piece.row, col: piece.col }, to: { row: newRow, col: newCol }, capturedPiece });
-                            } else if (Math.abs(direction[0]) === 1 && !capturedPiece) {
-                                moves.push({ piece, from: { row: piece.row, col: piece.col }, to: { row: newRow, col: newCol } });
-                            }
-                        }
+        const directions = player === 'player1' ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
+
+        state.cells.forEach((cell, index) => {
+            const row = Math.floor(index / 8);
+            const col = index % 8;
+
+            if (cell.player === player) {
+                const isKing = cell.king;
+
+                const moveDirections = isKing ? directions.concat(directions.map(d => d.map(n => n * -1))) : directions;
+
+                moveDirections.forEach(([rowOffset, colOffset]) => {
+                    const newRow = row + rowOffset;
+                    const newCol = col + colOffset;
+                    const jumpRow = row + 2 * rowOffset;
+                    const jumpCol = col + 2 * colOffset;
+
+                    if (isInBounds(newRow, newCol) && state.cells[newRow * 8 + newCol].player === undefined) {
+                        moves.push({ startRow: row, startCol: col, endRow: newRow, endCol: newCol, capture: false });
+                    } else if (
+                        isInBounds(jumpRow, jumpCol) &&
+                        state.cells[newRow * 8 + newCol].player !== player &&
+                        state.cells[newRow * 8 + newCol].player !== undefined &&
+                        state.cells[jumpRow * 8 + jumpCol].player === undefined
+                    ) {
+                        moves.push({ startRow: row, startCol: col, endRow: jumpRow, endCol: jumpCol, capture: true, capturedRow: newRow, capturedCol: newCol });
                     }
                 });
             }
         });
+
         return moves;
     }
 
-    function alpha_beta_search(boardCopy, limit) {
-        const alpha = NEG_INFINITY;
-        const beta = INFINITY;
-        const available_moves = get_available_moves('player2', boardCopy);
-        const max = max_value(boardCopy, available_moves, limit, alpha, beta);
+    function getBestMove(state, depth, evaluationFunction) {
+        let bestMove;
+        let bestValue = -Infinity;
+        let worstMove;
+        let worstValue = Infinity;
+        const moves = getPossibleMoves(state, 'player2');
+        const consideredMoves = [];
 
-        const best_moves = available_moves.filter(move => move.score === max);
-        const selected_move = best_moves[Math.floor(Math.random() * best_moves.length)];
-        return selected_move;
-    }
-
-    function max_value(boardCopy, moves, limit, alpha, beta) {
-        if (limit <= 0) {
-            return utility(boardCopy);
+        for (const move of moves) {
+            const newState = applyMove(cloneGameState(), move);
+            const moveValue = evaluationFunction(newState, depth - 1, -Infinity, Infinity, false);
+            consideredMoves.push(move);
+            console.log(`Move from (${move.startRow}, ${move.startCol}) to (${move.endRow}, ${move.endCol}) has value ${moveValue}`);
+            if (moveValue > bestValue) {
+                bestValue = moveValue;
+                bestMove = move;
+            }
+            if (moveValue < worstValue) {
+                worstValue = moveValue;
+                worstMove = move;
+            }
         }
-        let max = NEG_INFINITY;
-        moves.forEach(move => {
-            const newBoard = movePiece(boardCopy, move);
-            const newMoves = get_available_moves('player1', newBoard);
-            const min_score = min_value(newBoard, newMoves, limit - 1, alpha, beta);
-            move.score = min_score;
-            max = Math.max(max, min_score);
-            if (max >= beta) return max;
-            alpha = Math.max(alpha, max);
-        });
-        return max;
-    }
 
-    function min_value(boardCopy, moves, limit, alpha, beta) {
-        if (limit <= 0) {
-            return utility(boardCopy);
-        }
-        let min = INFINITY;
-        moves.forEach(move => {
-            const newBoard = movePiece(boardCopy, move);
-            const newMoves = get_available_moves('player2', newBoard);
-            const max_score = max_value(newBoard, newMoves, limit - 1, alpha, beta);
-            move.score = max_score;
-            min = Math.min(min, max_score);
-            if (min <= alpha) return min;
-            beta = Math.min(beta, min);
-        });
-        return min;
-    }
+        clearHighlights();
+        clearBestMoveHighlight();
+        clearWorstMoveHighlight();
+        highlightConsideredMoves(consideredMoves);
 
-    function movePiece(boardCopy, move) {
-        const newBoard = boardCopy.map(piece => ({ ...piece }));
-        const piece = newBoard.find(p => p.row === move.from.row && p.col === move.from.col);
-        piece.row = move.to.row;
-        piece.col = move.to.col;
-        if (move.capturedPiece) {
-            const capturedPieceIndex = newBoard.findIndex(p => p.row === parseInt(move.capturedPiece.dataset.row) && p.col === parseInt(move.capturedPiece.dataset.col));
-            newBoard.splice(capturedPieceIndex, 1);
-        }
-        return newBoard;
-    }
-
-    function computerMove() {
-        const boardCopy = copy_board();
-        const bestMove = alpha_beta_search(boardCopy, 4); // Search depth can be adjusted
         if (bestMove) {
-            const startCell = cells[bestMove.from.row * 8 + bestMove.from.col];
-            const endCell = cells[bestMove.to.row * 8 + bestMove.to.col];
-            const piece = startCell.querySelector('.piece');
-            animateMove(piece, endCell, bestMove.from.row, bestMove.from.col, bestMove.to.row, bestMove.to.col).then(() => {
-                if (bestMove.capturedPiece) {
-                    bestMove.capturedPiece.remove();
-                    updatePieceCount();
-                }
-                checkForKing(endCell);
-                checkGameOver();
-                switchPlayer();
-            });
+            highlightBestMove(bestMove);
         }
+        if (worstMove) {
+            highlightWorstMove(worstMove);
+        }
+
+        return bestMove;
+    }
+
+    function getBestMoveAlphaBeta(state, depth) {
+        return getBestMove(state, depth, alphaBeta);
+    }
+
+    function applyBestMove(move) {
+        const startCell = cells[move.startRow * 8 + move.startCol];
+        const endCell = cells[move.endRow * 8 + move.endCol];
+        const piece = startCell.children[0];
+
+        animateMove(piece, endCell, move.startRow, move.startCol, move.endRow, move.endCol).then(() => {
+            const capturedPiece = getCapturedPiece(move.startRow, move.startCol, move.endRow, move.endCol);
+            if (capturedPiece) {
+                capturedPiece.remove();
+                updatePieceCount();
+
+                // Handle multiple jumps
+                const isKing = piece.dataset.king === 'true';
+                if (checkForMultipleJumps(move.endRow, move.endCol, piece.dataset.player, isKing)) {
+                    piece.classList.add('selected');
+                    mustJumpPiece = piece;  // Track the piece that must continue jumping
+                    setTimeout(() => {
+                        const additionalMove = getBestMoveForPiece(mustJumpPiece);
+                        if (additionalMove) {
+                            applyBestMove(additionalMove);
+                        } else {
+                            mustJumpPiece = null;
+                            switchPlayer();
+                        }
+                    }, 500);
+                } else {
+                    mustJumpPiece = null;
+                    switchPlayer();
+                }
+            } else {
+                mustJumpPiece = null;
+                switchPlayer();
+            }
+
+            checkForKing(cells[move.endRow * 8 + move.endCol]);
+            checkGameOver();
+        });
+    }
+
+    function applyMove(state, move) {
+        const { startRow, startCol, endRow, endCol, capture, capturedRow, capturedCol } = move;
+
+        const startIndex = startRow * 8 + startCol;
+        const endIndex = endRow * 8 + endCol;
+        state.cells[endIndex] = { ...state.cells[startIndex] };
+        state.cells[startIndex] = { player: undefined, king: false };
+
+        if (capture) {
+            const capturedIndex = capturedRow * 8 + capturedCol;
+            if (state.cells[capturedIndex].player === 'player1') {
+                state.player1Pieces -= 1;
+            } else {
+                state.player2Pieces -= 1;
+            }
+            state.cells[capturedIndex] = { player: undefined, king: false };
+        }
+
+        if ((state.cells[endIndex].player === 'player1' && endRow === 0) || (state.cells[endIndex].player === 'player2' && endRow === 7)) {
+            state.cells[endIndex].king = true;
+        }
+
+        return state;
+    }
+
+    function getBestMoveForPiece(piece) {
+        const row = parseInt(piece.parentElement.dataset.row);
+        const col = parseInt(piece.parentElement.dataset.col);
+        const state = cloneGameState();
+        const moves = getPossibleMoves(state, piece.dataset.player);
+
+        return moves.find(move => move.startRow === row && move.startCol === col);
+    }
+
+    function highlightPossibleMoves(piece) {
+        const moves = getPossibleMovesForPiece(piece);
+        console.log('Possible moves:', moves);
+        moves.forEach(move => {
+            const endCell = cells[move.endRow * 8 + move.endCol];
+            endCell.classList.add('possible-move');
+            console.log(`Highlighting possible move to (${move.endRow}, ${move.endCol})`);
+        });
+    }
+
+    function getPossibleMovesForPiece(piece) {
+        const startRow = parseInt(piece.parentElement.dataset.row);
+        const startCol = parseInt(piece.parentElement.dataset.col);
+        const isKing = piece.dataset.king === 'true';
+        console.log(`Getting possible moves for piece at (${startRow}, ${startCol})`);
+        return getPossibleMoves(cloneGameState(), piece.dataset.player).filter(move =>
+            move.startRow === startRow && move.startCol === startCol
+        );
+    }
+
+    function highlightConsideredMoves(moves) {
+        clearConsideredMovesHighlight();
+        moves.forEach(move => {
+            const endCell = cells[move.endRow * 8 + move.endCol];
+            if (endCell.children.length === 0) { // Only highlight if the cell is empty
+                endCell.classList.add('considered-move');
+                console.log(`Highlighting considered move to (${move.endRow}, ${move.endCol})`);
+            }
+        });
+    }
+
+    function clearConsideredMovesHighlight() {
+        const consideredMoveCells = document.querySelectorAll('.considered-move');
+        consideredMoveCells.forEach(cell => cell.classList.remove('considered-move'));
+        console.log('Cleared considered move highlights');
+    }
+
+    function highlightBestMove(move) {
+        const endCell = cells[move.endRow * 8 + move.endCol];
+        endCell.classList.add('best-move');
+        console.log(`Highlighting best move to (${move.endRow}, ${move.endCol})`);
+    }
+
+    function highlightWorstMove(move) {
+        const endCell = cells[move.endRow * 8 + move.endCol];
+        endCell.classList.add('worst-move');
+        console.log(`Highlighting worst move to (${move.endRow}, ${move.endCol})`);
+    }
+
+    function clearBestMoveHighlight() {
+        const bestMoveCell = document.querySelector('.best-move');
+        if (bestMoveCell) {
+            bestMoveCell.classList.remove('best-move');
+            console.log('Cleared best move highlight');
+        }
+    }
+
+    function clearWorstMoveHighlight() {
+        const worstMoveCell = document.querySelector('.worst-move');
+        if (worstMoveCell) {
+            worstMoveCell.classList.remove('worst-move');
+            console.log('Cleared worst move highlight');
+        }
+    }
+
+    function isInBounds(row, col) {
+        return row >= 0 && row < 8 && col >= 0 && col < 8;
+    }
+
+    function clearHighlights() {
+        cells.forEach(cell => {
+            cell.classList.remove('possible-move', 'considered-move', 'best-move', 'worst-move');
+        });
+        console.log('Cleared all highlights');
     }
 });

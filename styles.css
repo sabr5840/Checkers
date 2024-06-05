@@ -27,6 +27,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+    position: relative; /* Ensure evaluation values are positioned correctly */
 }
 
 .cell.dark {
@@ -106,4 +107,17 @@ button {
 
 #player1-pieces, #player2-pieces {
     margin: 5px 0;
+}
+
+/* Add styles for considered, best, and worst moves */
+.considered-move {
+    border: 2px solid blue;
+}
+
+.best-move {
+    border: 2px solid green;
+}
+
+.worst-move {
+    border: 2px solid red;
 }
