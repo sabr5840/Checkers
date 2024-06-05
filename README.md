@@ -166,8 +166,3 @@ function minimax(state, depth, alpha, beta, isMaximizingPlayer) {
     }
 }
 
-
-## References
-- [Minimax Algorithm](https://en.wikipedia.org/wiki/Minimax)
-- [Alpha-Beta Pruning](https://en.wikipedia.org/wiki/Alpha–beta_pruning)
-- [Monte Carlo Tree Search](https://en.wikipedia.org/wiki/Monte_Carlo_tree_search)

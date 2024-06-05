@@ -27,7 +27,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    position: relative; /* Ensure evaluation values are positioned correctly */
+    position: relative;
 }
 
 .cell.dark {
@@ -110,14 +110,31 @@ button {
 }
 
 /* Add styles for considered, best, and worst moves */
-.considered-move {
-    border: 2px solid blue;
+.cell.considered-move::before,
+.cell.best-move::before,
+.cell.worst-move::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    box-sizing: border-box;
+    display: block;
 }
 
-.best-move {
-    border: 2px solid green;
+.cell.considered-move::before {
+    border: 2px solid rgb(255, 238, 0); /* Semi-transparent yellow */
+    z-index: 1;
 }
 
-.worst-move {
-    border: 2px solid red;
+.cell.best-move {
+    background-color: rgba(14, 185, 14, 0.694); /* Semi-transparent green */
+    position: relative;
+}
+
+.cell.worst-move::before {
+    border: 2px solid rgb(255, 0, 0); /* Semi-transparent red */
+    z-index: 3;
 }

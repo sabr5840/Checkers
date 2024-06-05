@@ -263,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 } else {
                     const state = cloneGameState();
-                    const bestMove = getBestMoveAlphaBeta(state, 4); // Set depth to 4 for alpha-beta decision-making
+                    const bestMove = getBestMoveAlphaBeta(state, 6); // Set depth to 6 for alpha-beta decision-making
 
                     if (bestMove) {
                         console.log('AlphaBeta best move: ', bestMove);
@@ -284,8 +284,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updatePieceCount() {
-        player1Pieces = document.querySelectorAll('.piece.player1').length;
-        player2Pieces = document.querySelectorAll('.piece.player2').length;
+        player1Pieces = document.querySelectorAll('.piece.player1, .piece.king-red').length;
+        player2Pieces = document.querySelectorAll('.piece.player2, .piece.king-black').length;
         player1PiecesDisplay.textContent = `Red Pieces: ${player1Pieces}`;
         player2PiecesDisplay.textContent = `Black Pieces: ${player2Pieces}`;
     }
@@ -502,19 +502,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         clearHighlights();
-        clearBestMoveHighlight();
-        clearWorstMoveHighlight();
         highlightConsideredMoves(consideredMoves);
 
         if (bestMove) {
             highlightBestMove(bestMove);
         }
-        if (worstMove) {
+        if (worstMove && worstMove !== bestMove) {
             highlightWorstMove(worstMove);
         }
 
         return bestMove;
     }
+
+    
 
     function getBestMoveAlphaBeta(state, depth) {
         return getBestMove(state, depth, alphaBeta);
@@ -525,7 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const endCell = cells[move.endRow * 8 + move.endCol];
         const piece = startCell.children[0];
 
-        animateMove(piece, endCell, move.startRow, move.startCol, move.endRow, move.endCol).then(() => {
+        animateMove(piece, endCell, move.startRow, startCell.dataset.col, move.endRow, endCell.dataset.col).then(() => {
             const capturedPiece = getCapturedPiece(move.startRow, move.startCol, move.endRow, move.endCol);
             if (capturedPiece) {
                 capturedPiece.remove();
@@ -635,37 +635,21 @@ document.addEventListener('DOMContentLoaded', () => {
         endCell.classList.add('best-move');
         console.log(`Highlighting best move to (${move.endRow}, ${move.endCol})`);
     }
-
+    
     function highlightWorstMove(move) {
         const endCell = cells[move.endRow * 8 + move.endCol];
         endCell.classList.add('worst-move');
         console.log(`Highlighting worst move to (${move.endRow}, ${move.endCol})`);
     }
-
-    function clearBestMoveHighlight() {
-        const bestMoveCell = document.querySelector('.best-move');
-        if (bestMoveCell) {
-            bestMoveCell.classList.remove('best-move');
-            console.log('Cleared best move highlight');
-        }
-    }
-
-    function clearWorstMoveHighlight() {
-        const worstMoveCell = document.querySelector('.worst-move');
-        if (worstMoveCell) {
-            worstMoveCell.classList.remove('worst-move');
-            console.log('Cleared worst move highlight');
-        }
-    }
-
-    function isInBounds(row, col) {
-        return row >= 0 && row < 8 && col >= 0 && col < 8;
-    }
-
+    
     function clearHighlights() {
         cells.forEach(cell => {
             cell.classList.remove('possible-move', 'considered-move', 'best-move', 'worst-move');
         });
         console.log('Cleared all highlights');
+    }
+
+    function isInBounds(row, col) {
+        return row >= 0 && row < 8 && col >= 0 && col < 8;
     }
 });
